@@ -1,0 +1,4 @@
+ct_liteone	    KEYWORD1
+ledBegin	    KEYWORD2
+buttonBegin	    KEYWORD3
+digitalBegin	KEYWORD4
