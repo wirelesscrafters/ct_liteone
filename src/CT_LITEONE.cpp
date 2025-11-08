@@ -71,12 +71,12 @@ void CT_LITEONE::digitalBegin(bool D0, bool D1, bool D2) {
     }
 }
 
-int CT_LITEONE::digitalReadPin(uint8_t position) {
-    if(position == 0 && D0Init) {
+int CT_LITEONE::digitalReadPin(uint8_t pin) {
+    if(pin == 0 && D0Init) {
         return digitalRead(CT_LITEONE_INPUT_D0);
-    } else if(position == 1 && D1Init) {
+    } else if(pin == 1 && D1Init) {
         return digitalRead(CT_LITEONE_INPUT_D1);
-    } else if(position == 2 && D2Init) {
+    } else if(pin == 2 && D2Init) {
         return digitalRead(CT_LITEONE_INPUT_D2);
     } else {
         return -1;
@@ -102,6 +102,64 @@ int CT_LITEONE::digitalReadPinD1() {
 int CT_LITEONE::digitalReadPinD2() {
     if(D2Init){
         return digitalRead(CT_LITEONE_INPUT_D2);
+    } else {
+        return -1;
+    }
+}
+
+// Analog input group function
+void CT_LITEONE::adcBegin(uint8_t Vref) {
+    pinMode(CT_LITEONE_SPI_CS, OUTPUT);
+    digitalWrite(CT_LITEONE_SPI_CS, HIGH);
+    if(!spiInit) {
+        SPI.begin();
+        spiInit = true;
+    }
+    _Vref = Vref;
+    adcInit = true;
+}
+
+uint8_t CT_LITEONE::spiTransfer(uint8_t i) {
+    if(spiInit && adcInit) {
+        uint8_t d;
+        d = SPI.transfer(i);
+        return d;
+    }
+    return 0;
+}
+
+uint16_t CT_LITEONE::analogRead(uint8_t pin) {
+    if(spiInit && adcInit) {
+        uint8_t addr = 0b01100000 | ((pin & 0b111) << 2);
+        digitalWrite(CT_LITEONE_SPI_CS, LOW);
+        (void) spiTransfer(addr);
+        uint8_t b1 = spiTransfer(0);
+        uint8_t b2 = spiTransfer(0);
+        digitalWrite(CT_LITEONE_SPI_CS, HIGH);
+
+        return (b1 << 4) | (b2 >> 4);
+    }
+    return 0
+}
+
+// RS485 group function
+
+void CT_LITEONE::_preTransmission() { digitalWrite(CT_LITEONE_INPUT_FC, 1); }
+void CT_LITEONE::_postTransmission() { digitalWrite(CT_LITEONE_INPUT_FC, 0); }
+
+void CT_LITEONE::rs485Begin(uint32_t baudrate, uint32_t config, uint32_t timeout) {
+    pinMode(CT_LITEONE_INPUT_FC, OUTPUT);
+    digitalWrite(CT_LITEONE_INPUT_FC, LOW);
+    Serial1.begin(baudrate, config, CT_LITEONE_INPUT_RX, CT_LITEONE_INPUT_TX, timeout_ms=timeout);
+    RS485Init = true;
+}
+
+int CT_LITEONE::rs485Configure(uint16_t address) {
+    if(RS485Init) {
+        ct_liteone_rs485.begin(address, Serial1);
+        ct_liteone_rs485.preTransmission(_preTransmission);
+        ct_liteone_rs485.postTransmission(_postTransmission);
+        return 1;
     } else {
         return -1;
     }
